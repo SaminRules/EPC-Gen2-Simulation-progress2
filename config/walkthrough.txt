@@ -1,0 +1,62 @@
+# PIE Decoder Architecture Fix — Walkthrough
+
+## Summary
+
+Fixed three interconnected bugs in the FPGA PIE decoder data path that prevented correct command decoding in the EPC Gen2 RFID tag baseband processor.
+
+## What Was Broken
+
+### Bug 1: Data path wiring in [rx.v](file:///c:/Users/msalam2/EPC-Gen2-Simulation-1-reset/rx.v)
+`cmd_buf`, `crc5`, and `crc16` were all sampling **raw `pie_code`** (the analog PIE waveform) on the rising edge of `pie_dec_clk` (the digitally reconstructed clock). Since the raw waveform is a multi-level time-encoded signal, its instantaneous value at the computed clock edge is meaningless — they needed the **decoded binary bit** from `pie_decoder`.
+
+### Bug 2: Timing misalignment in [pie_decoder.v](file:///c:/Users/msalam2/EPC-Gen2-Simulation-1-reset/pie_decoder.v)
+`bit_val` was set on the falling edge (end of symbol), but `dec_clk` toggled at a midpoint strobe fired during the *next* symbol. This created a one-symbol lag where `dec_clk` edges didn't correspond to the `bit_val` they were supposed to latch.
+
+### Bug 3: Redundant testbench stimulus
+The testbench generated a parallel `clk_dpie` waveform (mirroring the old ASIC delay-line approach), which was now unused but added confusion.
+
+---
+
+## Changes Made
+
+### [pie_decoder.v](file:///c:/Users/msalam2/EPC-Gen2-Simulation-1-reset/pie_decoder.v)
+- Replaced midpoint-strobe approach with `toggle_pending` pattern
+- On each falling edge: set `bit_val`, arm `toggle_pending`
+- Next cycle: toggle `dec_clk` and fire `bit_strobe`
+- Guarantees ≥1 clock cycle of setup time for downstream consumers
+
+### [rx.v](file:///c:/Users/msalam2/EPC-Gen2-Simulation-1-reset/rx.v)
+- Added `decoded_bit` input port
+- Routed to `cmd_buf.bits_in`, `crc5.data`, `crc16.data`
+- `pie_code` still used only by `fs_detector.rfid_in` for preamble detection
+
+### [bb_proc.v](file:///c:/Users/msalam2/EPC-Gen2-Simulation-1-reset/bb_proc.v)
+- Connected `pie_decoded_bit` → `rx_1.decoded_bit`
+
+### [bb_proc_tb.v](file:///c:/Users/msalam2/EPC-Gen2-Simulation-1-reset/bb_proc_tb.v)
+- Tied `clk_dpie` to `1'b1` (idle)
+- Removed entire parallel `clk_dpie` stimulus block (~125 lines)
+- Removed unused `frame_sync_dpie`, `dpie_0`, `dpie_1` tasks
+- Removed unused `data_j`, `j` variables
+- Added `cmd_state`, `tari_width` monitoring
+
+---
+
+## Verification — User Action Required
+
+No simulator is available on this machine. Run in your environment:
+
+```bash
+# Icarus Verilog
+iverilog -o bb_proc_sim *.v && vvp bb_proc_sim
+
+# Or Vivado
+xvlog *.v && xelab bb_proc_tb -timescale 1us/1ns -debug all && xsim bb_proc_tb -runall
+```
+
+**Check these signals in the waveform:**
+1. `pie_dec_clk` toggles once per decoded bit (not continuously)
+2. `bit_val` is stable before each `pie_dec_clk` rising edge
+3. `cmd_buf.cmd` shifts correctly and matches expected command codes
+4. `package_complete` fires at the right time for each command
+5. `crc_check_pass` asserts for commands with valid CRC

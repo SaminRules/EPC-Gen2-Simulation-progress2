@@ -32,6 +32,7 @@ output reg en_prng_act,
 output reg en_crc16_for_rpy,
 output reg en_if,
 output reg [18:0]addr,
+output [3:0]debug_state,
 input clk_cp,
 input clk_frm,
 input rst_n,
@@ -43,7 +44,8 @@ input [15:0]prn,
 input pre_p_complete,
 input p_complete,
 input rd_data,
-input rd_complete
+input rd_complete,
+input debug_switch
 );
 
 
@@ -96,6 +98,9 @@ parameter bs_error_code			= 5'h11;
 
 
 wire clk_cp_n;
+
+// --- debug state output assignment ---
+assign debug_state = ps;
 
 reg [7:0]cmd_checked;		// checked command
 reg [3:0]ps;			// present state
@@ -771,24 +776,31 @@ end
 always@(posedge clk_cp or negedge rst_n) begin
 	if(~rst_n) slot <= 15'h2ac7;
 	else if(act == init_inventory) begin
-		case(param[8:5])
-		    4'h0 : slot <= 15'b0;
-			4'h1 : slot <= {14'b0, prn[0]};
-			4'h2 : slot <= {13'b0, prn[1:0]};
-			4'h3 : slot <= {12'b0, prn[2:0]};
-			4'h4 : slot <= {11'b0, prn[3:0]};
-			4'h5 : slot <= {10'b0, prn[4:0]};
-			4'h6 : slot <= {9'b0, prn[5:0]};
-			4'h7 : slot <= {8'b0, prn[6:0]};
-			4'h8 : slot <= {7'b0, prn[7:0]};
-			4'h9 : slot <= {6'b0, prn[8:0]};
-			4'ha : slot <= {5'b0, prn[9:0]};
-			4'hb : slot <= {4'b0, prn[10:0]};
-			4'hc : slot <= {3'b0, prn[11:0]};
-			4'hd : slot <= {2'b0, prn[12:0]};
-			4'he : slot <= {1'b0, prn[13:0]};
-			4'hf : slot <= prn[14:0];
-		endcase
+		// if hardware debug switch enabled => FORCE SLOT 0: Immediate reply mode
+		if(debug_switch) begin
+			slot <= 15'b0;
+		end
+		else begin
+			// Standard random behavior: initialize slot based on param[8:5] using PRN
+			case(param[8:5])
+				4'hf : slot <= 15'b0;
+				4'h0 : slot <= {14'b0, prn[0]};
+				4'h1 : slot <= {13'b0, prn[1:0]};
+				4'h2 : slot <= {12'b0, prn[2:0]};
+				4'h3 : slot <= {11'b0, prn[3:0]};
+				4'h4 : slot <= {10'b0, prn[4:0]};
+				4'h5 : slot <= {9'b0, prn[5:0]};
+				4'h6 : slot <= {8'b0, prn[6:0]};
+				4'h7 : slot <= {7'b0, prn[7:0]};
+				4'h8 : slot <= {6'b0, prn[8:0]};
+				4'h9 : slot <= {5'b0, prn[9:0]};
+				4'ha : slot <= {4'b0, prn[10:0]};
+				4'hb : slot <= {3'b0, prn[11:0]};
+				4'hc : slot <= {2'b0, prn[12:0]};
+				4'hd : slot <= {1'b0, prn[13:0]};
+				4'he : slot <= prn[14:0];
+			endcase
+		end
 	end
 	else if(act == adj_q | act == adj_q_tran_if) begin
 		if(param[2:0] == 3'b110) begin
@@ -804,7 +816,7 @@ always@(posedge clk_cp or negedge rst_n) begin
 				4'h7 : slot <= {7'b0, prn[7:0]};
 				4'h8 : slot <= {6'b0, prn[8:0]};
 				4'h9 : slot <= {5'b0, prn[9:0]};
-				4'ha : slot <= {4'b0, prn[10:0]};
+				4'ha : slot <= {4'b0, prn[10:0]};	
 				4'hb : slot <= {3'b0, prn[11:0]};
 				4'hc : slot <= {2'b0, prn[12:0]};
 				4'hd : slot <= {1'b0, prn[13:0]};

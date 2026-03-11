@@ -4,3 +4,13 @@
 *.swp
 *.vcd
 *BAK*
+# Vivado Junk
+*.jou
+*.str
+*.zip
+.Xil/
+.cache/
+.hw/
+.ip_user_files/
+.runs/
+.sim/

@@ -32,6 +32,7 @@ output reg start_working,
 input clk_200K,					// 200 KHz input clock generated from multivibrator
 input clk_dpie,					// delayed PIE code
 input pie_code,
+input frame_sync,				// frame-sync valid from fs_detector (for rst_for_new_package)
 input rst,
 input dr,
 input [1:0]m,
@@ -102,12 +103,16 @@ assign rst_n = ~rst;
 
 
 // --- generate reset signal for a new package ---
-always@(negedge clk_dpie or negedge rst_n) begin
-	if(~rst_n) rst_for_new_package <= 1'b1;
-	else begin
-		if(~pie_code) rst_for_new_package <= 1'b0;
-		else rst_for_new_package <= 1'b1;
-	end
+// --- Frame reset for new package ---
+// In FPGA mode, rst_for_new_package is derived from frame_sync:
+//   frame_sync = 1 (frame active) → rst_for_new_package = 1 (normal operation)
+//   frame_sync = 0 (between frames) → rst_for_new_package = 0 (reset cmd_buf etc.)
+// Combinational: dec_clk may stop toggling when idle, so registered logic won't work.
+always @(*) begin
+	if (~rst_n)
+		rst_for_new_package = 1'b1;
+	else
+		rst_for_new_package = frame_sync;
 end
 
 

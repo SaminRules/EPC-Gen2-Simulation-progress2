@@ -1,0 +1,324 @@
+#! /c/Source/iverilog-install/bin/vvp
+:ivl_version "12.0 (devel)" "(s20150603-1539-g2693dd32b)";
+:ivl_delay_selection "TYPICAL";
+:vpi_time_precision - 9;
+:vpi_module "C:\iverilog\lib\ivl\system.vpi";
+:vpi_module "C:\iverilog\lib\ivl\vhdl_sys.vpi";
+:vpi_module "C:\iverilog\lib\ivl\vhdl_textio.vpi";
+:vpi_module "C:\iverilog\lib\ivl\v2005_math.vpi";
+:vpi_module "C:\iverilog\lib\ivl\va_math.vpi";
+S_0000020bbb42a4d0 .scope module, "led_rgb_tb" "led_rgb_tb" 2 18;
+ .timescale -6 -9;
+L_0000020bbb4d6ad0 .functor AND 1, L_0000020bbb48e2f0, v0000020bbb48de90_0, C4<1>, C4<1>;
+L_0000020bbb4d6b40 .functor NOT 1, L_0000020bbb4d6ad0, C4<0>, C4<0>, C4<0>;
+L_0000020bbb4d7010 .functor AND 1, L_0000020bbb4d8700, v0000020bbb48de90_0, C4<1>, C4<1>;
+L_0000020bbb4d6bb0 .functor NOT 1, L_0000020bbb4d7010, C4<0>, C4<0>, C4<0>;
+L_0000020bbb4d6e50 .functor OR 1, L_0000020bbb4d8980, L_0000020bbb4d7b20, C4<0>, C4<0>;
+L_0000020bbb4d69f0 .functor AND 1, L_0000020bbb4d6e50, v0000020bbb48de90_0, C4<1>, C4<1>;
+L_0000020bbb4d6c20 .functor OR 1, L_0000020bbb4d7f80, L_0000020bbb4d69f0, C4<0>, C4<0>;
+L_0000020bbb4d6d70 .functor NOT 1, L_0000020bbb4d6c20, C4<0>, C4<0>, C4<0>;
+L_0000020bbb48e8b8 .functor BUFT 1, C4<011>, C4<0>, C4<0>, C4<0>;
+v0000020bbb48db70_0 .net/2u *"_ivl_0", 2 0, L_0000020bbb48e8b8;  1 drivers
+v0000020bbb48da30_0 .net *"_ivl_10", 0 0, L_0000020bbb4d8700;  1 drivers
+v0000020bbb48d990_0 .net *"_ivl_12", 0 0, L_0000020bbb4d7010;  1 drivers
+L_0000020bbb48e948 .functor BUFT 1, C4<000>, C4<0>, C4<0>, C4<0>;
+v0000020bbb48e570_0 .net/2u *"_ivl_16", 2 0, L_0000020bbb48e948;  1 drivers
+v0000020bbb48e430_0 .net *"_ivl_18", 0 0, L_0000020bbb4d7f80;  1 drivers
+v0000020bbb48e610_0 .net *"_ivl_2", 0 0, L_0000020bbb48e2f0;  1 drivers
+L_0000020bbb48e990 .functor BUFT 1, C4<001>, C4<0>, C4<0>, C4<0>;
+v0000020bbb48e6b0_0 .net/2u *"_ivl_20", 2 0, L_0000020bbb48e990;  1 drivers
+v0000020bbb48e7f0_0 .net *"_ivl_22", 0 0, L_0000020bbb4d8980;  1 drivers
+L_0000020bbb48e9d8 .functor BUFT 1, C4<010>, C4<0>, C4<0>, C4<0>;
+v0000020bbb48e750_0 .net/2u *"_ivl_24", 2 0, L_0000020bbb48e9d8;  1 drivers
+v0000020bbb48d8f0_0 .net *"_ivl_26", 0 0, L_0000020bbb4d7b20;  1 drivers
+v0000020bbb48dcb0_0 .net *"_ivl_29", 0 0, L_0000020bbb4d6e50;  1 drivers
+v0000020bbb48dad0_0 .net *"_ivl_30", 0 0, L_0000020bbb4d69f0;  1 drivers
+v0000020bbb48dc10_0 .net *"_ivl_32", 0 0, L_0000020bbb4d6c20;  1 drivers
+v0000020bbb48dd50_0 .net *"_ivl_4", 0 0, L_0000020bbb4d6ad0;  1 drivers
+L_0000020bbb48e900 .functor BUFT 1, C4<100>, C4<0>, C4<0>, C4<0>;
+v0000020bbb48ddf0_0 .net/2u *"_ivl_8", 2 0, L_0000020bbb48e900;  1 drivers
+v0000020bbb48de90_0 .var "blink", 0 0;
+v0000020bbb48df30_0 .var "brain_state", 2 0;
+v0000020bbb48dfd0_0 .var/i "fail_count", 31 0;
+v0000020bbb48e110_0 .net "led0_b", 0 0, L_0000020bbb4d6d70;  1 drivers
+v0000020bbb48e070_0 .net "led0_g", 0 0, L_0000020bbb4d6bb0;  1 drivers
+v0000020bbb48e1b0_0 .net "led0_r", 0 0, L_0000020bbb4d6b40;  1 drivers
+v0000020bbb48e250_0 .var/i "pass_count", 31 0;
+L_0000020bbb48e2f0 .cmp/eq 3, v0000020bbb48df30_0, L_0000020bbb48e8b8;
+L_0000020bbb4d8700 .cmp/eq 3, v0000020bbb48df30_0, L_0000020bbb48e900;
+L_0000020bbb4d7f80 .cmp/eq 3, v0000020bbb48df30_0, L_0000020bbb48e948;
+L_0000020bbb4d8980 .cmp/eq 3, v0000020bbb48df30_0, L_0000020bbb48e990;
+L_0000020bbb4d7b20 .cmp/eq 3, v0000020bbb48df30_0, L_0000020bbb48e9d8;
+S_0000020bbb4316e0 .scope task, "check_rgb" "check_rgb" 2 50, 2 50 0, S_0000020bbb42a4d0;
+ .timescale -6 -9;
+v0000020bbb42aba0_0 .var "blink_val", 0 0;
+v0000020bbb434850_0 .var "exp_b", 0 0;
+v0000020bbb4033a0_0 .var "exp_g", 0 0;
+v0000020bbb319e80_0 .var "exp_r", 0 0;
+v0000020bbb48e390_0 .var "label", 63 0;
+v0000020bbb48e4d0_0 .var "state", 2 0;
+TD_led_rgb_tb.check_rgb ;
+    %load/vec4 v0000020bbb48e4d0_0;
+    %store/vec4 v0000020bbb48df30_0, 0, 3;
+    %load/vec4 v0000020bbb42aba0_0;
+    %store/vec4 v0000020bbb48de90_0, 0, 1;
+    %delay 1000, 0;
+    %load/vec4 v0000020bbb48e1b0_0;
+    %load/vec4 v0000020bbb319e80_0;
+    %cmp/e;
+    %flag_get/vec4 6;
+    %jmp/0 T_0.3, 6;
+    %load/vec4 v0000020bbb48e070_0;
+    %load/vec4 v0000020bbb4033a0_0;
+    %cmp/e;
+    %flag_get/vec4 6;
+    %and;
+T_0.3;
+    %flag_set/vec4 9;
+    %flag_get/vec4 9;
+    %jmp/0 T_0.2, 9;
+    %load/vec4 v0000020bbb48e110_0;
+    %load/vec4 v0000020bbb434850_0;
+    %cmp/e;
+    %flag_get/vec4 6;
+    %and;
+T_0.2;
+    %flag_set/vec4 8;
+    %jmp/0xz  T_0.0, 8;
+    %vpi_call 2 61 "$display", "PASS | state=%0d blink=%0b | R=%b G=%b B=%b | %0s", v0000020bbb48e4d0_0, v0000020bbb42aba0_0, v0000020bbb48e1b0_0, v0000020bbb48e070_0, v0000020bbb48e110_0, v0000020bbb48e390_0 {0 0 0};
+    %load/vec4 v0000020bbb48e250_0;
+    %addi 1, 0, 32;
+    %store/vec4 v0000020bbb48e250_0, 0, 32;
+    %jmp T_0.1;
+T_0.0 ;
+    %vpi_call 2 65 "$display", "FAIL | state=%0d blink=%0b | R=%b G=%b B=%b (exp %b %b %b) | %0s", v0000020bbb48e4d0_0, v0000020bbb42aba0_0, v0000020bbb48e1b0_0, v0000020bbb48e070_0, v0000020bbb48e110_0, v0000020bbb319e80_0, v0000020bbb4033a0_0, v0000020bbb434850_0, v0000020bbb48e390_0 {0 0 0};
+    %load/vec4 v0000020bbb48dfd0_0;
+    %addi 1, 0, 32;
+    %store/vec4 v0000020bbb48dfd0_0, 0, 32;
+T_0.1 ;
+    %end;
+    .scope S_0000020bbb42a4d0;
+T_1 ;
+    %pushi/vec4 0, 0, 32;
+    %store/vec4 v0000020bbb48e250_0, 0, 32;
+    %pushi/vec4 0, 0, 32;
+    %store/vec4 v0000020bbb48dfd0_0, 0, 32;
+    %end;
+    .thread T_1;
+    .scope S_0000020bbb42a4d0;
+T_2 ;
+    %vpi_call 2 76 "$dumpfile", "led_rgb_tb.vcd" {0 0 0};
+    %vpi_call 2 77 "$dumpvars", 32'sb00000000000000000000000000000000, S_0000020bbb42a4d0 {0 0 0};
+    %vpi_call 2 79 "$display", "=== LED RGB Brain Testbench ===" {0 0 0};
+    %vpi_call 2 80 "$display", "Active-LOW: 0=ON, 1=OFF" {0 0 0};
+    %vpi_call 2 81 "$display", "\000" {0 0 0};
+    %pushi/vec4 0, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1229212741, 0, 32; draw_string_vec4
+    %pushi/vec4 1600270368, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 0, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1229212741, 0, 32; draw_string_vec4
+    %pushi/vec4 1600270624, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 1, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1145392201, 0, 32; draw_string_vec4
+    %pushi/vec4 1298096688, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 1, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1145392201, 0, 32; draw_string_vec4
+    %pushi/vec4 1298096689, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 2, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1413567049, 0, 32; draw_string_vec4
+    %pushi/vec4 1600270368, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 2, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1413567049, 0, 32; draw_string_vec4
+    %pushi/vec4 1600270624, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 3, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1381253953, 0, 32; draw_string_vec4
+    %pushi/vec4 1281319472, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 3, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1381253953, 0, 32; draw_string_vec4
+    %pushi/vec4 1281319473, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 4, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1146048069, 0, 32; draw_string_vec4
+    %pushi/vec4 1600270368, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 4, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1146048069, 0, 32; draw_string_vec4
+    %pushi/vec4 1600270624, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 5, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 0, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1163022943, 0, 32; draw_string_vec4
+    %pushi/vec4 1647321120, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %pushi/vec4 5, 0, 3;
+    %store/vec4 v0000020bbb48e4d0_0, 0, 3;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb42aba0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb319e80_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb4033a0_0, 0, 1;
+    %pushi/vec4 1, 0, 1;
+    %store/vec4 v0000020bbb434850_0, 0, 1;
+    %pushi/vec4 1163022943, 0, 32; draw_string_vec4
+    %pushi/vec4 1647386656, 0, 32; draw_string_vec4
+    %concat/vec4; draw_string_vec4
+    %store/vec4 v0000020bbb48e390_0, 0, 64;
+    %fork TD_led_rgb_tb.check_rgb, S_0000020bbb4316e0;
+    %join;
+    %vpi_call 2 114 "$display", "\000" {0 0 0};
+    %vpi_call 2 115 "$display", "=== Results: %0d PASS, %0d FAIL ===", v0000020bbb48e250_0, v0000020bbb48dfd0_0 {0 0 0};
+    %load/vec4 v0000020bbb48dfd0_0;
+    %cmpi/e 0, 0, 32;
+    %jmp/0xz  T_2.0, 4;
+    %vpi_call 2 118 "$display", "ALL TESTS PASSED" {0 0 0};
+    %jmp T_2.1;
+T_2.0 ;
+    %vpi_call 2 120 "$display", "SOME TESTS FAILED" {0 0 0};
+T_2.1 ;
+    %vpi_call 2 122 "$finish" {0 0 0};
+    %end;
+    .thread T_2;
+# The file index is used to find the file name in the following table.
+:file_names 3;
+    "N/A";
+    "<interactive>";
+    "led_rgb_tb.v";

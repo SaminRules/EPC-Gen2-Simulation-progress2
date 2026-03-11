@@ -1,0 +1,7 @@
+{
+  "claude_haiku_4_5": {
+    "enabled": true,
+    "scope": "all",
+    "description": "Enable Claude Haiku 4.5 for all clients"
+  }
+}

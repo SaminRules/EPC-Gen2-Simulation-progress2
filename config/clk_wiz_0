@@ -1,0 +1,4 @@
+module clk_wiz_0 (output clk_out1, input clk_in1, input reset, output locked);
+    assign clk_out1 = clk_in1; // Just pass the testbench clock through
+    assign locked = 1'b1;
+endmodule
