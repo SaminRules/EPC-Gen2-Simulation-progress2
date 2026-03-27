@@ -104,15 +104,17 @@ assign rst_n = ~rst;
 
 // --- generate reset signal for a new package ---
 // --- Frame reset for new package ---
-// In FPGA mode, rst_for_new_package is derived from frame_sync:
-//   frame_sync = 1 (frame active) → rst_for_new_package = 1 (normal operation)
-//   frame_sync = 0 (between frames) → rst_for_new_package = 0 (reset cmd_buf etc.)
-// Combinational: dec_clk may stop toggling when idle, so registered logic won't work.
-always @(*) begin
-	if (~rst_n)
-		rst_for_new_package = 1'b1;
-	else
-		rst_for_new_package = frame_sync;
+// Synchronize frame_sync into the pie_dec_clk domain to prevent
+// async races between rst_for_new_package and cmd_buf's clk_cmd.
+reg frame_sync_d;
+always @(posedge clk_dpie or negedge rst_n) begin
+    if (~rst_n) begin
+        frame_sync_d        <= 1'b0;
+        rst_for_new_package <= 1'b1;
+    end else begin
+        frame_sync_d        <= frame_sync;
+        rst_for_new_package <= frame_sync_d;   // 1-stage delay eliminates race
+    end
 end
 
 
@@ -123,7 +125,7 @@ assign rst_crc16 = rst_for_new_package & ~rst_for_cpu_crc16;
 
 
 // --- generate clock signal of CRC-5 ---
-always@(negedge clk_dpie or negedge rst_n) begin
+always@(posedge clk_dpie or negedge rst_n) begin
 	if(~rst_n) en_crc5_d <= 1'b0;
 	else en_crc5_d <= en_crc5;
 end

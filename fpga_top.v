@@ -23,7 +23,7 @@
  *     │
  * Clocking Wizard (PLL) → 5 MHz clock
  *     │
- *     ├──→ glitch_filter (4-cycle digital integrator on rfid_in)
+ *     ├──→ glitch_filter (3-cycle contiguous-sample debouncer on rfid_in)
  *     ├──→ fs_detector (pulse-width @ 200ns resolution)
  *     ├──→ pie_decoder (symbol-level PIE decoding + clock recovery)
  *     ├──→ heartbeat_cnt (unused, retained to avoid removing counter)
@@ -37,11 +37,11 @@
  * SIGNAL CONDITIONING — GLITCH FILTER
  * ================================================================
  *
- * A 4-cycle digital integrator sits between rfid_in and all downstream
- * logic.  The filter uses a 4-bit shift register clocked at 5 MHz;
- * the output changes only when ≥3 of the last 4 samples agree.
- * This filters glitches shorter than 800 ns (4 × 200 ns), protecting
- * the CRC-5 check and PIE decoder from analog jitter.
+ * A 3-cycle contiguous-sample debouncer sits between rfid_in and all
+ * downstream logic.  The filter requires 3 consecutive 5 MHz samples
+ * to agree before accepting a level change.
+ * This filters glitches shorter than 600 ns (3 × 200 ns), protecting
+ * the CRC-5 check and PIE decoder from baseline noise.
  *
  * ================================================================
  * DIAGNOSTIC BYPASS SYSTEM
@@ -123,6 +123,8 @@ module fpga_top(
 
     (* mark_debug = "true" *) wire [3:0] cmd_state;  // cmd_proc EPC Gen2 FSM present state
     (* mark_debug = "true" *) wire [15:0] tari_width; // Measured Tari period from fs_detector
+    (* mark_debug = "true" *) wire pie_bit_out;       // PIE decoded bit value
+    (* mark_debug = "true" *) wire pie_clk_out;       // PIE decoded clock pulse
 
     // ---------------------------------------------------------------
     // 1. Heartbeat LED — visual board confirmation
@@ -173,32 +175,42 @@ module fpga_top(
     );
 
     // ---------------------------------------------------------------
-    // 4. Glitch Filter — 4-cycle digital integrator on rfid_in
-    //    Shift register samples rfid_in at 5 MHz (200 ns/tick).
-    //    Output changes only when ≥3 of the last 4 samples agree.
-    //    Filters glitches shorter than 800 ns.
+    // 4. Glitch Filter / Debouncer on rfid_in
+    //    The envelope detector comparator oscillates during the long LOW dips
+    //    of TARI25US DSB-ASK. We need a strong digital filter.
+    //    Wait for N contiguous identical samples before changing output.
     // ---------------------------------------------------------------
-    reg [3:0] gf_sr;        // 4-bit shift register
-    reg       gf_out;       // filtered output
+    localparam [1:0] DB_LIMIT = 2'd3;  // 3 ticks * 200ns = 600ns stability required
+
+    reg [1:0] gf_cnt;
+    reg       rfid_sync0, rfid_sync1; // 2-FF synchronizer for raw async input
+    reg       gf_out;
 
     always @(posedge clk_5mhz or posedge rst_btn) begin
         if (rst_btn) begin
-            gf_sr  <= 4'b0000;
-            gf_out <= 1'b0;
+            rfid_sync0 <= 1'b1;
+            rfid_sync1 <= 1'b1;
+            gf_cnt     <= 2'd0;
+            gf_out     <= 1'b1;
         end else begin
-            gf_sr <= {gf_sr[2:0], rfid_in};  // shift in new sample
-
-            // Majority vote: ≥3 of 4 HIGH → output HIGH
-            // ≥3 of 4 LOW  → output LOW
-            // Otherwise: hold previous value
-            case (gf_sr)
-                4'b1111, 4'b1110, 4'b1101, 4'b1011, 4'b0111:
-                    gf_out <= 1'b1;
-                4'b0000, 4'b0001, 4'b0010, 4'b0100, 4'b1000:
-                    gf_out <= 1'b0;
-                default:
-                    gf_out <= gf_out;  // hold (2 vs 2 — hysteresis)
-            endcase
+            // 1. Synchronize the raw asynchronous antenna input
+            rfid_sync0 <= ~rfid_in; // INVERT: Analog idles LOW but Gen2 expects idle HIGH
+            rfid_sync1 <= rfid_sync0;
+            
+            // 2. Continuous stability counter
+            if (rfid_sync1 == gf_out) begin
+                // Input matches current stable output, reset counter
+                gf_cnt <= 2'd0;
+            end else begin
+                // Input differs from stable output, count up
+                if (gf_cnt == DB_LIMIT) begin
+                    // Input has been stable at the new value for DB_LIMIT cycles, accept it
+                    gf_out <= rfid_sync1;
+                    gf_cnt <= 2'd0;
+                end else begin
+                    gf_cnt <= gf_cnt + 2'd1;
+                end
+            end
         end
     end
 
@@ -221,6 +233,8 @@ module fpga_top(
         .brain_state(brain_state),
         .cmd_state(cmd_state),     // cmd_proc EPC Gen2 FSM state → RGB LED logic
         .tari_width(tari_width),   // Measured Tari for ILA
+        .pie_bit_out(pie_bit_out), // PIE decoded bit → ILA shift register
+        .pie_clk_out(pie_clk_out), // PIE decoded clock → ILA shift register
         .ila_fs(ila_fs),
         .dbg_pulse_width(dbg_pulse_width)
     );
@@ -233,7 +247,7 @@ module fpga_top(
     //    led[3]: OFF (hardcoded)  — eliminates extra noise
     // ---------------------------------------------------------------
     assign led[0] = 1'b0;                      // Hardcoded OFF
-    assign led[1] = locked & ~rfid_filtered;   // Ears: listening (locked, no cmd)
+    assign led[1] = locked & rfid_filtered;   // Ears: listening (locked, antenna idle HIGH)
     assign led[2] = tag_reply;                 // Mouth: ON during tag reply
     assign led[3] = 1'b0;                      // Hardcoded OFF
 
@@ -471,5 +485,52 @@ module fpga_top(
     // 10. Logic Analyzer / Oscilloscope Outputs
     // ---------------------------------------------------------------
     assign tx_debug = tag_reply;       // Connect scope here
+
+    // ---------------------------------------------------------------
+    // 11. PIE Bit Capture Register (ILA Debug)
+    //     16-bit shift register: shifts in pie_bit_out on each
+    //     pie_clk_out pulse. MSB-first (bit 0 arrives first in [15]).
+    //     pie_bit_cnt tracks how many bits have been captured (0–31).
+    //     Both are mark_debug for ILA visibility.
+    //     Reset on sync deassertion (package_complete or error).
+    // ---------------------------------------------------------------
+    (* mark_debug = "true" *) reg [15:0] pie_bits_captured;
+    (* mark_debug = "true" *) reg [4:0]  pie_bit_cnt;
+    reg ila_fs_latched;  // Once set, stays set until rst_btn or extended deassert
+    reg [7:0] ila_fs_deassert_cnt;  // Count consecutive cycles of !ila_fs
+
+    always @(posedge clk_5mhz or posedge rst_btn) begin
+        if (rst_btn) begin
+            pie_bits_captured <= 16'd0;
+            pie_bit_cnt      <= 5'd0;
+            ila_fs_latched    <= 1'b0;
+            ila_fs_deassert_cnt <= 8'd0;
+        end else if (ila_fs) begin
+            ila_fs_latched <= 1'b1;
+            ila_fs_deassert_cnt <= 8'd0;
+            if (pie_clk_out) begin
+                pie_bits_captured <= {pie_bits_captured[14:0], pie_bit_out};
+                pie_bit_cnt      <= pie_bit_cnt + 5'd1;
+            end
+        end else if (ila_fs_latched) begin
+            // Sync dropped but we were capturing — wait for extended deassert
+            if (ila_fs_deassert_cnt >= 8'd250) begin
+                // Genuine end-of-packet: clear
+                pie_bits_captured <= 16'd0;
+                pie_bit_cnt      <= 5'd0;
+                ila_fs_latched    <= 1'b0;
+            end else begin
+                ila_fs_deassert_cnt <= ila_fs_deassert_cnt + 8'd1;
+                // Still capturing during glitch window
+                if (pie_clk_out) begin
+                    pie_bits_captured <= {pie_bits_captured[14:0], pie_bit_out};
+                    pie_bit_cnt      <= pie_bit_cnt + 5'd1;
+                end
+            end
+        end else if (pie_clk_out) begin
+            pie_bits_captured <= {pie_bits_captured[14:0], pie_bit_out};
+            pie_bit_cnt      <= pie_bit_cnt + 5'd1;
+        end
+    end
 
 endmodule

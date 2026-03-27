@@ -18,10 +18,11 @@
  *        with the HIGH period between dips encoding the actual timing info
  *
  *  Strategy:
- *    - Delimiter: detect a LOW dip in the range [50..80] ticks
- *    - Tari: measure the full falling-to-falling edge period of data-0
- *    - RTcal: measure the full falling-to-falling edge period of RTcal
- *    - Validate RTcal > 2 * Tari using the pivot
+ *    - Delimiter: detect a LOW dip in the range [DELIM_MIN..DELIM_MAX]
+ *    - S_TARI  : wait for E3 (Data-0 falling edge); counter measures dead-time
+ *                between delimiter rising edge and Data-0 dip ─ not stored
+ *    - S_RTCAL : counts E3→E4 (Data-0 falling → RTcal falling) = true Tari
+ *                stores result as tari_count, asserts sync
  *
  *  Frame-Sync sequence:
  *    Delimiter (long LOW dip)
@@ -51,20 +52,24 @@ module fs_detector
     localparam [2:0] S_IDLE  = 3'd0,   // Waiting for Delimiter LOW dip
                      S_DELIM = 3'd1,   // Inside Delimiter LOW dip
                      S_TARI  = 3'd2,   // Measuring Tari symbol period
-                     S_RTCAL = 3'd3,   // Measuring RTcal symbol period
+                     S_RTCAL = 3'd3,   // Measuring RTcal symbol period (stores Tari)
                      S_DONE  = 3'd4,   // Frame-sync valid
-                     S_ERROR = 3'd5;   // Invalid timing
+                     S_ERROR = 3'd5,   // Invalid timing
+                     S_TRCAL = 3'd6;   // Consume TRcal/last-preamble symbol; fire sync at data edge
 
     // ---------------------------------------------------------------
     // Timing thresholds (5 MHz clock, 200 ns/tick)
     // ---------------------------------------------------------------
     // Delimiter LOW dip: 12.5 us nominal → 62.5 ticks, accept 50–80
-    localparam [15:0] DELIM_MIN = 16'd50;
-    localparam [15:0] DELIM_MAX = 16'd80;
+    //localparam [15:0] DELIM_MIN = 16'd50;
+    //localparam [15:0] DELIM_MAX = 16'd80;
+    localparam [15:0] DELIM_MIN = 16'd70;
+    localparam [15:0] DELIM_MAX = 16'd150;
 
-    // Tari full period (falling→falling): 6.25 us = 31.25 ticks, accept 10–50
+    // Tari full period (falling→falling): accept 10–200
+    // Widened from 50 to 200 to support TARI25US (half-Tari ≈ 62 ticks at 5 MHz)
     localparam [15:0] TARI_MIN = 16'd10;
-    localparam [15:0] TARI_MAX = 16'd50;
+    localparam [15:0] TARI_MAX = 16'd200;
 
     // ---------------------------------------------------------------
     // Input synchronizer (2-FF) — initialized to idle state (0)
@@ -162,51 +167,72 @@ module fs_detector
                         end
                     end else if (rfid_sync == 1'b0) begin
                         pulse_counter <= pulse_counter + 16'd1;
+                        if (pulse_counter > 16'd5000) state <= S_ERROR; // 1 ms timeout (CW detected)
                     end
                 end
 
                 // -------------------------------------------------
-                // S_TARI: Measure Tari as falling→falling period
-                //   Counter was reset to 1 at the Delimiter's rising edge.
-                //   On next falling edge: that's one full Tari period.
+                // S_TARI: Wait for E3 — the Data-0 falling edge.
+                //   Counter here measures the dead-time between the
+                //   delimiter's rising edge and Data-0's dip start.
+                //   This is NOT Tari — we do not store it.
+                //   On falling_edge: reset counter, move to S_RTCAL
+                //   which will measure the true F→F Tari (E3→E4).
                 // -------------------------------------------------
                 S_TARI: begin
                     if (falling_edge) begin
-                        // Sample-then-reset: capture Tari period
-                        pulse_width   <= pulse_counter;
-                        tari_count    <= pulse_counter;
-                        pulse_counter <= 16'd1;
-                        // Validate Tari
-                        if (pulse_counter >= TARI_MIN &&
-                            pulse_counter <= TARI_MAX) begin
-                            state <= S_RTCAL;
-                        end else begin
-                            state <= S_ERROR;
-                        end
+                        pulse_counter <= 16'd1;  // Start true Tari measurement (E3→E4)
+                        state         <= S_RTCAL;
                     end else begin
                         pulse_counter <= pulse_counter + 16'd1;
+                        if (pulse_counter > 16'd5000) state <= S_ERROR; // 1 ms timeout
                     end
                 end
 
                 // -------------------------------------------------
-                // S_RTCAL: Measure RTcal as falling→falling period
-                //   On next falling edge: that's the full RTcal period.
-                //   Validate: RTcal > 2 * Tari
+                // S_RTCAL: Measure true falling→falling Tari (E3→E4).
+                //   E3 = Data-0 dip start  (counter reset in S_TARI)
+                //   E4 = RTcal  dip start  (falling_edge here)
+                //   pulse_counter at E4 = full Data-0 symbol period = Tari.
+                //   Validate Tari in [TARI_MIN..TARI_MAX], then assert sync.
                 // -------------------------------------------------
                 S_RTCAL: begin
                     if (falling_edge) begin
-                        // Sample-then-reset
+                        // Store the true falling→falling Tari (E3→E4)
                         pulse_width   <= pulse_counter;
+                        tari_count    <= pulse_counter;
                         pulse_counter <= 16'd1;
-                        // Validate RTcal > 2 * Tari
-                        if (pulse_counter > {tari_count[14:0], 1'b0}) begin
-                            sync  <= 1'b1;
-                            state <= S_DONE;
+                        // Validate Tari range, then wait one more edge (TRcal or
+                        // Frame-Sync boundary) before firing sync so the PIE
+                        // decoder starts exactly at the first data symbol.
+                        if (pulse_counter >= TARI_MIN &&
+                            pulse_counter <= TARI_MAX) begin
+                            state <= S_TRCAL;  // Do NOT assert sync yet
                         end else begin
                             state <= S_ERROR;
                         end
                     end else begin
                         pulse_counter <= pulse_counter + 16'd1;
+                        if (pulse_counter > 16'd5000) state <= S_ERROR;
+                    end
+                end
+
+                // -------------------------------------------------
+                // S_TRCAL: Skip the TRcal symbol (or the equivalent
+                //   dead period in a Frame-Sync frame). Assert sync
+                //   on the FIRST falling edge after RTcal, which is
+                //   exactly the start of the first data symbol.
+                //   The PIE decoder's D_WAIT_FE then measures from
+                //   this edge to the next = true first data bit.
+                // -------------------------------------------------
+                S_TRCAL: begin
+                    if (falling_edge) begin
+                        sync  <= 1'b1;   // Fire sync at first data falling edge
+                        state <= S_DONE;
+                        pulse_counter <= 16'd1;
+                    end else begin
+                        pulse_counter <= pulse_counter + 16'd1;
+                        if (pulse_counter > 16'd5000) state <= S_ERROR;
                     end
                 end
 
@@ -217,6 +243,14 @@ module fs_detector
                     if (package_complete) begin
                         sync  <= 1'b0;
                         state <= S_IDLE;
+                    end else if (falling_edge) begin
+                        pulse_counter <= 16'd1;     // reset timeout on new symbols within the packet
+                    end else begin
+                        pulse_counter <= pulse_counter + 16'd1;
+                        if (pulse_counter > 16'd5000) begin // 1 ms without falling edges (CW detected) -> deadlock release
+                            sync  <= 1'b0;
+                            state <= S_ERROR;
+                        end
                     end
                 end
 

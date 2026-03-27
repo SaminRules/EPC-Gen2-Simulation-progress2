@@ -1,36 +1,21 @@
 /*
- *  PIE Decoder — Synchronous Symbol-Level Decoder
+ * PIE Decoder — Synchronous Symbol-Level Decoder
  *
- *  Replaces the ASIC's analog clk_dpie delay-line approach with a fully
- *  digital PIE decoder running on the 5 MHz system clock.
- *
- *  After fs_detector asserts `sync` (frame-sync valid), this module:
- *    1. Detects falling edges on `rfid_in` (start of each PIE symbol)
- *    2. Measures the full symbol period (falling-edge → falling-edge)
- *    3. Compares period against 1.5 × tari_width (the pivot):
- *         period ≤ pivot → data-0
- *         period >  pivot → data-1
- *    4. On each falling edge (= end of previous symbol), sets `bit_val`
- *       and then toggles `dec_clk` one cycle later so downstream logic
- *       (cmd_buf, CRC) sees stable data on the posedge of dec_clk.
- *
- *  Timing diagram for downstream consumers:
- *    falling_edge →  bit_val updated (same cycle)
- *    +1 cycle     →  dec_clk toggles (posedge → cmd_buf shifts bits_in)
- *                    bit_val is stable with >1 cycle of setup time.
- *
- *  Dynamic Clock Recovery:
- *    pivot = tari_width + (tari_width >> 1)   [i.e., 1.5 × tari_width]
- *    This adapts automatically to the reader's actual Tari timing.
+ * Replaces the ASIC's analog clk_dpie delay-line approach with a fully
+ * digital PIE decoder running on the 5 MHz system clock.
  */
 
 `timescale 1us / 1ns
 
 module pie_decoder
+#(
+    parameter USE_PRECISION_CLOCK = 0,       // 1 = use crystal-derived Tari (bypass preamble measurement)
+    parameter NOMINAL_TARI_TICKS  = 31       // 6.2 us @ 5 MHz quartz — set to match reader's Tari
+)
 (
     output reg         bit_val,        // Decoded data bit (0 or 1)
     output reg         bit_strobe,     // Single-cycle pulse when bit_val is valid
-    output reg         dec_clk,        // Reconstructed clock (toggles 1 cycle after bit_val)
+    output reg         dec_clk,        // Reconstructed clock (1-cycle pulse after bit_val)
 
     input  wire        clk,            // 5 MHz system clock
     input  wire        rst_n,          // Active-low reset
@@ -77,11 +62,19 @@ module pie_decoder
     wire falling_edge = (rfid_prev == 1'b1) && (rfid_sync == 1'b0);
 
     // ---------------------------------------------------------------
-    // Pivot computation (registered for timing closure)
-    //   fs_detector's tari_width = half-Tari (delimiter-rise to first
-    //   data-0 falling edge). pie_decoder measures FULL symbol periods
-    //   (falling→falling), so full_tari = 2 × tari_width.
-    //   pivot = 1.5 × full_tari = 3 × tari_width
+    // Precision Clock Mode
+    //  When USE_PRECISION_CLOCK=1, bypass the fs_detector's preamble
+    //  measurement (which can be distorted by the analog front-end)
+    //  and use a crystal-derived constant instead.
+    //  The mux is optimized away at synthesis — zero LUTs.
+    // ---------------------------------------------------------------
+    wire [15:0] active_tari = (USE_PRECISION_CLOCK)
+                              ? NOMINAL_TARI_TICKS[15:0]
+                              : tari_width;
+
+    // ---------------------------------------------------------------
+    // Pivot computation
+    //  pivot = 1.5 × active_tari to distinguish Data-0 from Data-1.
     // ---------------------------------------------------------------
     reg [15:0] pivot;
 
@@ -89,7 +82,7 @@ module pie_decoder
         if (~rst_n) begin
             pivot <= 16'd0;
         end else begin
-            pivot <= tari_width + {tari_width[14:0], 1'b0};  // 3 × tari_width
+            pivot <= active_tari + (active_tari >> 2);  // 1.25 × active_tari (12-tick margin at Tari=47)
         end
     end
 
@@ -102,7 +95,8 @@ module pie_decoder
     // State machine
     // ---------------------------------------------------------------
     reg [1:0] state;
-    reg       toggle_pending; // Fire dec_clk toggle one cycle after bit_val set
+    reg       toggle_pending; // Fire dec_clk pulse one cycle after bit_val set
+    reg [7:0] measure_guard;  // Minimum-active counter: ignore sync drops for first N cycles
 
     always @(posedge clk or negedge rst_n) begin
         if (~rst_n) begin
@@ -112,63 +106,66 @@ module pie_decoder
             bit_strobe     <= 1'b0;
             dec_clk        <= 1'b0;
             toggle_pending <= 1'b0;
+            measure_guard  <= 8'd0;
         end else begin
             // Default: clear single-cycle signals
             bit_strobe <= 1'b0;
+            dec_clk    <= 1'b0; // Default to 0, creating a clean 1-cycle pulse when triggered
 
-            // ----- Delayed dec_clk toggle -----
-            // One cycle after bit_val was set (toggle_pending), toggle
-            // dec_clk. This guarantees bit_val has >= 1 clock cycle of
-            // setup time before cmd_buf samples it on posedge dec_clk.
+            // ----- Delayed dec_clk pulse -----
+            // One cycle after bit_val was set, pulse dec_clk HIGH. 
+            // This guarantees bit_val has 1 full clock cycle of setup time 
+            // before cmd_buf samples it.
             if (toggle_pending) begin
-                dec_clk        <= ~dec_clk;
+                dec_clk        <= 1'b1;
                 bit_strobe     <= 1'b1;
                 toggle_pending <= 1'b0;
             end
 
             case (state)
-                // -------------------------------------------------
-                // D_IDLE: Wait for fs_detector to assert sync
-                // -------------------------------------------------
                 D_IDLE: begin
-                    sym_counter    <= 16'd0;
-                    dec_clk        <= 1'b0;
                     toggle_pending <= 1'b0;
                     if (sync) begin
-                        state <= D_WAIT_FE;
+                        sym_counter <= 16'd1; // Start counting from sync assertion
+                        state       <= D_WAIT_FE;
+                    end else begin
+                        sym_counter <= 16'd0;
                     end
                 end
 
-                // -------------------------------------------------
-                // D_WAIT_FE: Wait for the first falling edge after
-                //   RTcal completes. This is the boundary between
-                //   RTcal and the first data symbol.
-                //   We start counting from this edge.
-                // -------------------------------------------------
                 D_WAIT_FE: begin
+                    // Wait for the first falling edge after sync.
+                    // Do NOT decode a bit here — the sync→first-edge interval
+                    // is a preamble artifact (TRcal/frame-sync boundary), not
+                    // a real data symbol.  Just transition to D_MEASURE so the
+                    // first REAL data bit is decoded on the next falling edge.
                     if (package_complete || !sync) begin
                         state <= D_IDLE;
                     end else if (falling_edge) begin
-                        sym_counter <= 16'd1;
-                        state       <= D_MEASURE;
+                        sym_counter    <= 16'd1;
+                        state          <= D_MEASURE;
+                        measure_guard  <= 8'd0;  // Start guard timer
+                    end else begin
+                        sym_counter <= sym_counter + 16'd1;
                     end
                 end
 
-                // -------------------------------------------------
-                // D_MEASURE: Count ticks of each symbol period.
-                //   On falling edge → the previous symbol is complete.
-                //   Decode its period vs pivot, set bit_val immediately,
-                //   schedule dec_clk toggle for next cycle.
-                // -------------------------------------------------
                 D_MEASURE: begin
-                    if (package_complete || !sync) begin
+                    // Guard: don't check sync/package_complete for the first
+                    // 200 cycles (~40us at 5MHz) after entering D_MEASURE.
+                    // This prevents CRG feedback glitches from killing the
+                    // decoder before any real data is captured.
+                    if (measure_guard < 8'd200)
+                        measure_guard <= measure_guard + 8'd1;
+
+                    if ((measure_guard >= 8'd200) && (package_complete || !sync)) begin
                         state <= D_IDLE;
+                        measure_guard <= 8'd0;
                     end else if (falling_edge) begin
                         // --- End of the current symbol ---
-                        // Decode the just-completed symbol
                         bit_val        <= (sym_counter > pivot) ? 1'b1 : 1'b0;
-                        toggle_pending <= 1'b1;  // dec_clk toggles next cycle
-                        sym_counter    <= 16'd1; // reset for the new symbol
+                        toggle_pending <= 1'b1;  // Trigger clock pulse for next cycle
+                        sym_counter    <= 16'd1; // Reset for the new symbol
                     end else begin
                         sym_counter <= sym_counter + 16'd1;
                     end
